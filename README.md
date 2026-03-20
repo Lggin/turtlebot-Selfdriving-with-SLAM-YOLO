@@ -1,121 +1,74 @@
-# 🚗 ROS 2 & Isaac Sim Autonomous Navigation Project
-
-본 프로젝트는 **NVIDIA Isaac Sim**과 **ROS 2 (Humble)** 를 연동하여, 가상 환경 내에서 Ackermann 조향 차량의 자율주행을 구현한 시스템입니다. A* 알고리즘을 활용한 전역 경로 계획과 OpenCV 기반의 차선 인식(Vision) 알고리즘을 결합하여 교차로와 직진 구간을 자율적으로 주행합니다.
-
----
-
-## 🌟 주요 기능 (Key Features)
-
-* **A* 기반 전역 경로 계획 (Global Path Planning)**: 사전에 정의된 노드(Map Database)와 간선(Edge)을 바탕으로 목표 지점까지의 최단 경로를 실시간으로 계산합니다.
-* **비전 기반 차선 유지 보조 (Vision-based Lane Keeping)**: HSV 색상 필터링과 관심 영역(ROI) 설정을 통해 차선(파란색 선)을 인식하고, 이미지 모멘트를 활용하여 조향 오차를 보정합니다.
-* **듀얼 네비게이션 모드 (Dual Navigation Mode)**:
-  * `VISION Mode`: 장거리 직진 도로에서 카메라 데이터를 기반으로 차선을 따라 주행합니다.
-  * `BLIND Mode`: 교차로 통과 및 회전 시, 목표 노드와의 각도(Yaw) 및 오도메트리(Odometry)를 계산하여 하드코딩된 조향각으로 안전하게 회전합니다.
-* **실시간 2D 맵 UI (Real-Time 2D Map UI)**: `matplotlib` 및 `networkx`를 활용하여 현재 차량의 위치와 A* 알고리즘으로 생성된 경로를 별도의 창에 실시간으로 시각화합니다.
-* **Isaac Sim & ROS 2 Bridge**: 고품질 물리 엔진인 Isaac Sim 환경에서 카메라 영상(`/camera_left/image_raw`)과 오도메트리(`/odom`)를 받아, 차량 제어 명령(`/ackermann_cmd`)을 퍼블리시합니다.
+# 🛒 Smart Mart AutoBot Project
+> ROS 2 + 비전 AI + 웹 대시보드를 통합한 **스마트 쇼핑카트 및 완전 무인화 마트 시스템**
 
 ---
 
-## 🏗️ 시스템 설계 (System Architecture)
+## 📌 Overview
 
-* **Simulator (NVIDIA Isaac Sim)**
-  * `map_car.py` 스크립트를 통해 `map.usd`와 `ackermann_car_fixed_cam.usd`를 로드합니다.
-  * **Sensors**: Camera (RGB), Odometry
-  * **Actuators**: Ackermann Steering Controller
-* **ROS 2 Node (`autonomous_nav_node`)**
-  * **Subscribers**: 
-    * `/camera_left/image_raw` (sensor_msgs/Image) - 차선 인식용
-    * `/odom` (nav_msgs/Odometry) - 차량 위치 및 자세 추정용
-    * `/set_goal` (std_msgs/String) - 목적지 수신용
-  * **Publishers**:
-    * `/ackermann_cmd` (ackermann_msgs/AckermannDriveStamped) - 차량 조향 및 속도 제어
-    * `/camera_left/lane_overlay` (sensor_msgs/Image) - 디버깅용 차선 인식 결과 이미지
+Smart Mart AutoBot은 대형 마트에서 발생하는 **고객의 쇼핑 피로도**, **관리자의 재고 파악 지연**, 그리고 **결제 대기 병목 현상**을 해결하기 위해 기획된 지능형 자동화 시스템입니다.
+
+TurtleBot4 모바일 로봇(AMR) 2대를 각각 **고객 추종용 스마트 카트(AMR 1)**와 **자동 재고 보충 로봇(AMR 2)**으로 분리 운용하며, 딥러닝 비전(YOLOv8)과 웹 기반 실시간 DB 동기화 기술을 결합하여 매장 내 자원 흐름을 최적화했습니다.
 
 ---
 
-## 🔄 알고리즘 플로우 차트 (Logic Flow)
+## 💡 Motivation
 
-1. **목적지 입력**: GUI Prompt 또는 `/set_goal` 토픽을 통해 목적지 문자열 수신.
-2. **경로 탐색**: A* 알고리즘으로 `start` -> `goal` 까지의 노드 리스트 생성.
-3. **주행 루프 시작 (0.05초 주기)**:
-   * **현재 구간 판별**: 현재 노드와 다음 노드가 '교차로(Intersection)'나 '센터(Center)'인지 판별.
-   * **모드 분기**:
-     * **[VISION 모드]**: 직진 구간. OpenCV로 차선의 중심점을 찾아 `lane_offset` 계산 -> 오차에 따라 PID(P제어 기반) 조향 및 속도 조절.
-     * **[BLIND 모드]**: 교차로/회전 구간. 현재 Yaw 값과 목표 노드의 각도를 비교하여 Type 1/2/3의 고정 조향각(`fixed_turn_steer`) 적용.
-4. **노드 도달 확인**: `/odom` 기반 현재 좌표와 목표 노드 간의 거리가 허용 오차(`tolerance`) 이내인지 확인.
-5. **업데이트**: 다음 노드로 타겟 변경 및 3번으로 회귀 (최종 목적지 도착 시 주행 종료).
+* **쇼핑 편의성 극대화:** 무거운 카트를 직접 끌지 않고, 로봇이 안전한 거리를 유지하며 고객을 자율적으로 추종합니다.
+* **실시간 오차 없는 구매 처리:** 영상 인식 오류로 인한 오결제를 막기 위해 ROI(관심 구역) 설정 및 60프레임 연속 탐지 알고리즘을 적용했습니다.
+* **시스템 최적화 (System Optimization):** 한정된 컴퓨팅 자원 내에서 무거운 비전 연산, ROS 2 주행, Flask 통신이 동시에 충돌 없이 돌아가도록 멀티스레딩 및 상태 머신(State Machine) 아키텍처를 적용했습니다.
 
 ---
 
-## 📂 디렉토리 구조 (Directory Structure)
+## 🏗 System Architecture
 
-    src/project/
-    ├── project/
-    │   ├── line_detecing.py      # ROS 2 자율주행 알고리즘 노드
-    │   └── map_car.py            # Isaac Sim 맵 및 차량 로드 스크립트
-    └── resource/                 # 3D 모델 및 에셋 디렉토리
-        ├── map.usd
-        ├── ackermann_car_fixed_cam.usd
-        └── assets/
+### 핵심 구성 요소
 
----
-
-## 💻 개발 환경 (Environment)
-
-* **OS**: Ubuntu 22.04 LTS
-* **Middleware**: ROS 2 Humble
-* **Simulator**: NVIDIA Isaac Sim
-* **Language**: Python 3.10+
+| 구성 요소 | 역할 |
+| :--- | :--- |
+| **ROS 2 Humble** | 노드 간 비동기 메시지 통신 (로봇 이동, 상태 전송) |
+| **AMR 1 (Smart Cart)** | OAK-D RGB-D 센서 + YOLOv8을 활용한 타겟 추종 (P 제어 적용) |
+| **AMR 2 (Restock Robot)** | Nav2 웨이포인트 주행 및 LiDAR(0.5m 이내) 기반 긴급 제동 |
+| **Flask + SocketIO** | 고객 및 관리자 웹 대시보드, 실시간 영상/데이터 양방향 스트리밍 |
+| **SQLite DB** | 유저 정보, 장바구니, 매대/창고 재고 상태 실시간 트랜잭션 관리 |
 
 ---
 
-## 🛠️ 사용 장비 (Hardware Setup)
+## 🔄 System Flow
 
-* **CPU**: (사용하신 CPU 모델명 입력, 예: Intel Core i7)
-* **GPU**: NVIDIA RTX 시리즈 (Isaac Sim 구동을 위해 필수)
-* **RAM**: 32GB 이상 권장
+### 1. 고객 추종 및 쇼핑 (AMR 1)
+1. 고객이 입구 구역(Entrance Zone) 진입 시 비전 센서가 감지 (`customer position` 발행).
+2. AMR 1이 도킹 해제 후 고객을 찾아 일정한 거리(0.65m)를 유지하며 자율 추종 모드(`FOLLOW`) 돌입.
+3. 카메라 ROI 내에 상품이 인식(60프레임 유지)되면 고객 대시보드에 구매 팝업 생성.
+
+### 2. 결제 및 예산 관리
+1. 고객 구매 승인 시 DB 매대 재고 즉시 차감 및 장바구니 동기화.
+2. 누적 금액이 설정된 예산을 초과하면 로봇에서 경고 알람(`beep_node`) 발생.
+3. 고객이 계산대 구역(Counter Zone) 도착 시 결제 진행 및 로봇 귀환(`finish_shopping`).
+
+### 3. 지능형 재고 보충 (AMR 2)
+1. 매대 재고가 0이 되면 관리자 대시보드로 알람 전송 (`out_of_stock`).
+2. 관리자 승인 시 AMR 2가 창고에서 해당 상품의 웨이포인트로 정밀 이동.
+3. 보충 작업 완료 후 자동으로 충전 스테이션 복귀 및 도킹.
 
 ---
 
-## 📦 의존성 설치 (Installation)
+## 🛠 Tech Stack
 
-ROS 2 Humble 및 Isaac Sim이 설치되어 있어야 하며, 추가적인 Python 패키지 설치가 필요합니다.
-
-    # 필요한 Python 패키지 설치
-    pip3 install numpy opencv-python matplotlib networkx
+* **Environment:** Ubuntu 22.04 LTS, ROS 2 Humble
+* **Robotics:** TurtleBot4 (AMR), Nav2 (Navigation Stack)
+* **AI & Vision:** YOLOv8, OpenCV, CvBridge, OAK-D Camera, 2D Web Cam
+* **Backend / DB:** Python 3.10, Flask, Flask-SocketIO, SQLite3
+* **Frontend:** HTML/CSS, JavaScript
 
 ---
 
-## 🚀 실행 순서 (How to Run)
+## 📂 Project Structure
 
-시스템은 원활한 연동을 위해 두 개의 터미널을 분리하여 실행합니다.
-
-### 1. 시뮬레이터 환경 실행 (Terminal 1)
-
-Isaac Sim을 구동하고 맵과 차량을 스폰합니다. ROS 2 Bridge 익스텐션이 포함되어 있습니다.
-
-    # ROS 2 및 Isaac Sim 환경 변수 설정
-    export ROS_DISTRO=humble
-    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/rokey/isaacsim/exts/isaacsim.ros2.bridge/humble/lib
-
-    # Isaac Sim 파이썬 스크립트 실행
-    /home/rokey/isaacsim/python.sh /home/rokey/IsaacSim-ros_workspaces/humble_ws/src/project/project/map_car.py
-
-*(기다리면 Isaac Sim 창이 열리고 맵과 차량이 로드됩니다.)*
-
-### 2. 자율주행 알고리즘 노드 실행 (Terminal 2)
-
-시뮬레이터가 완전히 로드된 후, 자율주행 노드를 실행합니다.
-
-    # ROS 2 워크스페이스 환경 설정
-    source /opt/ros/humble/setup.bash
-
-    # 스크립트가 있는 디렉토리로 이동
-    cd /home/rokey/IsaacSim-ros_workspaces/humble_ws/src/project/project
-
-    # 자율주행 노드 실행
-    python3 line_detecing.py
-
-* **실행 시 참고사항**: 실행 시 목적지 입력을 묻는 작은 GUI 창이 뜹니다. (예: `fire_station`, `home`, `opistel` 등)
-* 입력 후 확인을 누르면 차량이 자율주행을 시작하며, 2D 맵 UI 창을 통해 실시간 위치 및 경로를 확인할 수 있습니다.
+```text
+mart_autobot/
+├── amr1.py                   # 고객 추종 및 상태 머신 제어 (RGB-D + P 제어)
+├── AMR2_control.py           # Nav2 기반 상품별 웨이포인트 주행 및 충돌 방지
+├── beep_node.py              # 예산 초과 시 로봇 오디오 알람 발생
+├── person_detection.py       # YOLOv8 기반 구역(입구, 계산대) 내 고객 감지
+├── customer_monitor.py       # 고객용 웹 서버, 실시간 비전 상품 탐지 및 장바구니 DB 관리
+└── admin_monitor_topic.py    # 관리자용 웹 서버, 재고 모니터링 및 로봇 출동 승인
